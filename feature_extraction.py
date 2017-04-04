@@ -1,7 +1,11 @@
 from collections import defaultdict
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import StratifiedKFold
+from sklearn import preprocessing
+import re
 
-
-class BaseFeatureExtraction:
+class BaseFeatureExtraction(object):
 	def __init__(self):
 		self.method_info = ''
 	def print_info(self):
@@ -13,7 +17,7 @@ class BaseFeatureExtraction:
 
 class CategoricalFeature(BaseFeatureExtraction):
     def __init__(self):
-        super(CategoricalFeature , self ).__init__()
+        super(CategoricalFeature, self ).__init__()
     
     def prepare_categorical(self,df1_,df2_):
         df1 = df1_.copy()
@@ -90,8 +94,7 @@ class Categorical_cv(CategoricalFeature):
         k_fold = StratifiedKFold(self.nfold,shuffle=True,random_state=222)
         fea_name = variable + '_' + target
         fea_train = np.zeros(len(X_train))
-        fea_test = np.zeros(len(X_test))
-    
+            
         for train_inx,cv_inx in k_fold.split(np.zeros((len(X_train),2)),X_train['interest_level'].ravel()):
             fea_train[cv_inx] = self.cat2num(X_train.iloc[train_inx,:],X_train.iloc[cv_inx,:],variable,target)
     
@@ -167,7 +170,6 @@ class CategoricalLit(CategoricalFeature):
         k_fold = StratifiedKFold(self.nfold,shuffle=True,random_state=222)
         fea_name = variable + '_' + target +'_lit'
         fea_train = np.zeros(len(X_train))
-        fea_test = np.zeros(len(X_test))
     
         for train_inx,cv_inx in k_fold.split(np.zeros((len(X_train),2)),X_train['interest_level'].ravel()):
             fea_train[cv_inx] = self.cat2num(X_train.iloc[train_inx,:],X_train.iloc[cv_inx,:],variable,target)
@@ -203,11 +205,11 @@ class CategoricalLit(CategoricalFeature):
         return Xtrain,Xtest,fea_list    
 
 class TextFeature(BaseFeatureExtraction):
-	def __init__(self,nTop=300,combine=True):
-		self.nTop = nTop
-		self.combine = combine
-		super(TextFeature,self).__init__()
-		self.method_info = "Keyword features extract from the column features"
+    def __init__(self,nTop=300,combine=True):
+        super(TextFeature,self).__init__()
+        self.nTop = nTop
+        self.combine = combine		
+        self.method_info = "Keyword features extract from the column features"
         
     def transform(self,df_train,df_test):
         #df1_ is training set
@@ -259,7 +261,7 @@ class TextFeature(BaseFeatureExtraction):
                    #'garage':['garage','parking']
                    }
     
-        fea_list = set([v[0] for v in sorted_fea[:nTop]])
+        fea_list = set([v[0] for v in sorted_fea[:self.nTop]])
         for k,v in combined_fea.iteritems():
             fea_list = fea_list.union(set(v))
         for fea in fea_list:
@@ -277,7 +279,7 @@ class TextFeature(BaseFeatureExtraction):
         #df.set_value(inx,'description',row['description'] + ' '.join(notlist))
         #print 'fea_list length is {}'.format(len(fea_list))
         fea_list = set(fea_list)
-        if combine:        
+        if self.combine:        
             for k,v in combined_fea.iteritems():
                 df[k] = df[v[0]]
             #print k,v
@@ -327,7 +329,7 @@ class AddressFeature(BaseFeatureExtraction):
                 if tmp in street_name_mapping:
                     tmp = street_name_mapping[tmp]
                 elif tmp.isdigit():
-                    tmp = normalize_num(tmp)
+                    tmp = self.normalize_num(tmp)
                 else:
                     pass
                 output.append(tmp)
@@ -470,16 +472,16 @@ class AddressFeature(BaseFeatureExtraction):
         return df1,df2,fea_list
         
 
-    def transform(train_df_,test_df_):        
+    def transform(self,train_df_,test_df_):        
         train_df = train_df_.copy()
         test_df = test_df_.copy()
         
         train_df['address_num'] = train_df['street_address'].map(self.get_address_num_simple)
         test_df['address_num'] = test_df['street_address'].map(self.get_address_num_simple)
-        train_df['display_address'] = train_df['display_address'].map(lambda x:normalize_street(x))
-        test_df['display_address'] = test_df['display_address'].map(lambda x:normalize_street(x))
-        train_df['street_address'] = train_df['street_address'].map(lambda x:normalize_street(x))
-        test_df['street_address'] = test_df['street_address'].map(lambda x:normalize_street(x))
+        train_df['display_address'] = train_df['display_address'].map(lambda x:self.normalize_street(x))
+        test_df['display_address'] = test_df['display_address'].map(lambda x:self.normalize_street(x))
+        train_df['street_address'] = train_df['street_address'].map(lambda x:self.normalize_street(x))
+        test_df['street_address'] = test_df['street_address'].map(lambda x:self.normalize_street(x))
         
         flist = ['address_num']
         train_df,test_df,ff1 = self.manhattan_locale(train_df,test_df)
@@ -489,10 +491,15 @@ class AddressFeature(BaseFeatureExtraction):
         flist = flist + ff1
         return train_df,test_df,flist
 
-def PriceQuantileFeature(BaseFeatureExtraction):
+class PriceQuantileFeature(BaseFeatureExtraction):
+    
     def __init__(self,axis_1='longitude',axis_2='latitude',step_size=0.02,nLevel=10):
+        '''
+        axis_1 = 'longitude'
+        axis_2 = 'latitude'
+        '''
         super(PriceQuantileFeature,self).__init__()
-        self.method_info = "Price Quantile over grid and over all listing for each (bathroom,bedroom) pair"
+        self.method_info = r"Price Quantile over grid and over all listing for each (bathroom,bedroom) pair"
         self.axis_1 = axis_1
         self.axis_2 = axis_2
         self.step_size = step_size
@@ -522,7 +529,7 @@ def PriceQuantileFeature(BaseFeatureExtraction):
         df = df1.append(df2)
         df = df.reset_index(drop=True)
         
-        df = get_quantile_by_key(df,['bedrooms','bathrooms'],self.nLevel,'price_quantile')
+        df = self.get_quantile_by_key(df,['bedrooms','bathrooms'],self.nLevel,'price_quantile')
                     
         df1 = df[df['source']==1].copy()
         df2 = df[df['source']==2].copy()
@@ -541,10 +548,10 @@ def PriceQuantileFeature(BaseFeatureExtraction):
         df = df.reset_index(drop=True)
         
         west, south, east, north = -74.02, 40.64, -73.85, 40.86
-        df['long_grid'] = df[self.axis_1].map(lambda x: int(round((x-west)/step_size)))
-        df['lat_grid'] = df[self.axis_2].map(lambda x:int(round((x-south)/step_size)))
+        df['long_grid'] = df[self.axis_1].map(lambda x: int(round((x-west)/self.step_size)))
+        df['lat_grid'] = df[self.axis_2].map(lambda x:int(round((x-south)/self.step_size)))
         
-        df = get_quantile_by_key(df,['long_grid','lat_grid','bedrooms','bathrooms'],nLevel,'price_quantile_lat_long')
+        df = self.get_quantile_by_key(df,['long_grid','lat_grid','bedrooms','bathrooms'],self.nLevel,'price_quantile_lat_long')
                     
         df1 = df[df['source']==1].copy()
         df2 = df[df['source']==2].copy()
@@ -555,8 +562,8 @@ def PriceQuantileFeature(BaseFeatureExtraction):
         return df1,df2,['price_quantile_lat_long','long_grid','lat_grid']
 
     def transform(self,train_df,test_df):
-        train_df,test_df,fealist_quant1 = quantile_price_lat_long(train_df,test_df)
-        train_df,test_df,fealist_quant2 = quantile_price(train_df,test_df)
+        train_df,test_df,fealist_quant1 = self.quantile_price_lat_long(train_df,test_df)
+        train_df,test_df,fealist_quant2 = self.quantile_price(train_df,test_df)
         return train_df,test_df,fealist_quant1 + fealist_quant2
 
 class Miscellous(BaseFeatureExtraction):
