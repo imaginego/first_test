@@ -221,8 +221,8 @@ class TextFeature(BaseFeatureExtraction):
         df2['source'] = 2
         df = df1.append(df2)
         df = df.reset_index(drop=True)
+        
 
-        #df['features'] = df['features'].map(lambda x:[tt.lower() for tt in x])
         df['description'] = df['description'].map(lambda x:x.lower())
         #---------------------------
         #original length of the first feature, meant to capture those features typed in with wrong 
@@ -478,6 +478,7 @@ class AddressFeature(BaseFeatureExtraction):
         
         train_df['address_num'] = train_df['street_address'].map(self.get_address_num_simple)
         test_df['address_num'] = test_df['street_address'].map(self.get_address_num_simple)
+        
         train_df['display_address'] = train_df['display_address'].map(lambda x:self.normalize_street(x))
         test_df['display_address'] = test_df['display_address'].map(lambda x:self.normalize_street(x))
         train_df['street_address'] = train_df['street_address'].map(lambda x:self.normalize_street(x))
@@ -503,7 +504,7 @@ class PriceQuantileFeature(BaseFeatureExtraction):
         self.axis_1 = axis_1
         self.axis_2 = axis_2
         self.step_size = step_size
-        self.nLvel = nLevel
+        self.nLevel = nLevel
 
     def get_quantile_by_key(self,df,keys,nLevel,newcol_name):
         #keys is a list of keys to groupby on
@@ -548,6 +549,7 @@ class PriceQuantileFeature(BaseFeatureExtraction):
         df = df.reset_index(drop=True)
         
         west, south, east, north = -74.02, 40.64, -73.85, 40.86
+        #import pdb;pdb.set_trace()
         df['long_grid'] = df[self.axis_1].map(lambda x: int(round((x-west)/self.step_size)))
         df['lat_grid'] = df[self.axis_2].map(lambda x:int(round((x-south)/self.step_size)))
         

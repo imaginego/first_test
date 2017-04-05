@@ -32,7 +32,7 @@ class BaseModel(object):
         self.X_test = data_test.copy()
 		#self.feature_names =  
         for ff in self.feature_list:
-            print ff
+            print ff.get_info()
             self.X_train,self.X_test,tmp= ff.transform(self.X_train,self.X_test)
             self.feature_names += tmp
             
