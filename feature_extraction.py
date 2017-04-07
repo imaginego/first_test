@@ -492,6 +492,59 @@ class AddressFeature(BaseFeatureExtraction):
         flist = flist + ff1
         return train_df,test_df,flist
 
+class GbmQuantPrice(BaseFeatureExtraction):
+    def __init__(self,independent_var,output_name):
+        #independent_var can be:
+        # 1. ['longitude','latitude']
+        # 2. ['longitude','latitude','bathrooms']
+        # 3. ['polar_rho','polar_theta']
+        # 4. ['polar_rho','polar_theta','bathrooms']
+        
+        super(GbmQuantPrice,self).__init__()
+        self.method_info = r"Use GBM to predict quantile house price using GBM quantile regression"
+        self.independent_var = independent_var
+        self.output_name = output_name
+        
+    def transform(self,train_df_,test_df_):
+        from sklearn.ensemble import GradientBoostingRegressor
+    
+        df1 = train_df_.copy()
+        df2 = test_df_.copy()
+        df1['source'] = 1
+        df2['source'] = 2
+        df = df1.append(df2)
+        df = df.reset_index(drop=True)
+    
+        df[self.output_name] = 4
+    
+        for room in range(0,6):
+            if room>=5:
+                mask = (df['bedrooms']>=5)
+            else:
+                mask = (df['bedrooms']==room)
+            tmp = df[mask].copy()
+        
+            jj = 0
+            all_quantile = np.zeros((len(tmp),9))
+            for alpha in np.arange(0.1,1,0.1):
+                rgr = GradientBoostingRegressor(loss='quantile',alpha=alpha,n_estimators=100,max_depth=2)
+                rgr.fit(tmp[self.independent_var],tmp['price'].as_matrix().ravel())
+                pred = rgr.predict(tmp[self.independent_var])
+                all_quantile[:,jj] = pred
+                jj += 1
+            quant_res = [np.searchsorted(all_quantile[ii,:],tmp['price'].iloc[ii]) for ii in range(len(tmp))]
+            df.loc[mask,self.output_name] = quant_res
+        
+    
+        df1 = df[df['source']==1].copy()
+        df2 = df[df['source']==2].copy()
+        del df1['source']
+        del df2['source']
+        del df
+    
+        return df1,df2,[self.output_name]
+
+
 class PriceQuantileFeature(BaseFeatureExtraction):
     
     def __init__(self,axis_1='longitude',axis_2='latitude',step_size=0.02,nLevel=10):
@@ -567,6 +620,8 @@ class PriceQuantileFeature(BaseFeatureExtraction):
         train_df,test_df,fealist_quant1 = self.quantile_price_lat_long(train_df,test_df)
         train_df,test_df,fealist_quant2 = self.quantile_price(train_df,test_df)
         return train_df,test_df,fealist_quant1 + fealist_quant2
+
+
 
 class Miscellous(BaseFeatureExtraction):
     def __init__(self):
