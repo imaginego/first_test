@@ -23,5 +23,5 @@ def write_output(preds,test_df,prefix=''):
     out_df["listing_id"] = test_df.listing_id.values
     
     import time
-    filename = prefix + time.strftime("%Y.%m.%d.") + str(np.random.randint(0,100000))+'.res.csv'
+    filename = prefix + time.strftime("%m.%d.") + '.csv'
     out_df.to_csv(filename, index=False)
