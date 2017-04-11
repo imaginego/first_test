@@ -284,7 +284,7 @@ class Stacking_model(BaseModel):
                             seed=seed)       
         
         
-    def fit_predicpt_roba(self,nClass,nFold=9):    
+    def fit_predict_proba(self,nClass,nFold=9):    
         pred = np.zeros((self.X_test.shape[0],nClass))
         kfold = model_selection.StratifiedKFold(nFold,shuffle=True)
         for tr_inx,cv_inx in kfold.split(self.X_train,self.y_train):
