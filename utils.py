@@ -1,7 +1,7 @@
 import pandas as pd 
 
-def read_data():
-    data_path = "../input/"
+def read_data(data_path='../input/'):
+    
     train_file = data_path + "train.json"
     test_file = data_path + "test.json"
     train_df = pd.read_json(train_file)

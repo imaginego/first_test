@@ -288,12 +288,12 @@ class Stacking_model(BaseModel):
         pred = np.zeros((self.X_test.shape[0],nClass))
         kfold = model_selection.StratifiedKFold(nFold,shuffle=True)
         for tr_inx,cv_inx in kfold.split(self.X_train,self.y_train):
-        #import pdb;pdb.set_trace()
+            #import pdb;pdb.set_trace()
             if self.clf1 == 'random forest':
                 clf1 = RandomForestClassifier(**self.param1)
-            if self.clf1 == 'gradient boosting':
+            elif self.clf1 == 'gradient boosting':
                 clf1 = GradientBoostingClassifier(**self.param1)
-            if self.clf1 == 'extra trees':
+            elif self.clf1 == 'extra trees':
                 clf1 = ExtraTreesClassifier(**self.param1)
             else:
                 raise NameError("Invalid Classifiers one")

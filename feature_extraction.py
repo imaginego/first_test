@@ -16,26 +16,44 @@ class BaseFeatureExtraction(object):
 		return self.method_info
 	def transform(self,X_train,X_test):
 		return X_train,X_test
-
-class CategoricalFeature(BaseFeatureExtraction):
-    def __init__(self,bEncoding):
-        super(CategoricalFeature, self ).__init__()
-        self.bEncoding = bEncoding
     
-    def label_encoding(self,df1,df2):
+class CategoricalEncoding(BaseFeatureExtraction):
+    def __init__(self):
+        super(CategoricalEncoding, self ).__init__()
+        
+    
+    def transform(self,df_train,df_test):
         #categorical = ['building_id', 'manager_id', 'display_address']
-        categorical = ['building_id', 'manager_id']
-        fea_list = categorical
+        df1 = df_train.copy()
+        df2 = df_test.copy()
+        df1['source'] = 1
+        df2['source'] = 2
+        df = df1.append(df2)
+        df = df.reset_index(drop=True)
+        
+        categorical = ['building_id', 'manager_id','street_address']
+        fea_list = [x+'_coding' for x in categorical]
         for f in categorical:
             encoder = preprocessing.LabelEncoder()
-            encoder.fit(list(df1[f]) + list(df2[f])) 
-            df1[f] = encoder.transform(df1[f].ravel())
-            df2[f] = encoder.transform(df2[f].ravel())
-            mm = max(max(df1[f]),max(df2[f]))
+            tmp = df[f].copy().sort_values()
+            encoder.fit(tmp) 
+            df1[f+'_coding'] = encoder.transform(df1[f].ravel())
+            df2[f+'_coding'] = encoder.transform(df2[f].ravel())
+            mm = max(max(df1[f+'_coding']),max(df2[f+'_coding']))
             mm = mm*1.0
-            df1[f] = df1[f]/mm
-            df2[f] = df2[f]/mm
+            df1[f+'_coding'] = df1[f+'_coding']/mm
+            df2[f+'_coding'] = df2[f+'_coding']/mm
+               
+        del df1['source']
+        del df2['source']
+        del df
+        
         return df1,df2,fea_list
+
+class CategoricalFeature(BaseFeatureExtraction):
+    def __init__(self):
+        super(CategoricalFeature, self ).__init__()
+            
     
     def objects_with_only_one_record(self,df,feature_name):
             #import pdb;pdb.set_trace()
@@ -81,8 +99,8 @@ class CategoricalFeature(BaseFeatureExtraction):
         return df1,df2
     
 class Categorical_cv(CategoricalFeature):
-    def __init__(self,nfold,bEncoding,k=3.0,f=1.0,r_k=0.01,g=1.0):
-        super(Categorical_cv,self).__init__(bEncoding)
+    def __init__(self,nfold,k=3.0,f=1.0,r_k=0.01,g=1.0):
+        super(Categorical_cv,self).__init__()
         self.nfold = nfold     
         self.k = k
         self.f = f
@@ -135,10 +153,8 @@ class Categorical_cv(CategoricalFeature):
         #    Xtrain[f] = encoder.transform(Xtrain[f].ravel())
         #    Xtest[f] = encoder.transform(Xtest[f].ravel())
             
-        if self.bEncoding:
-            Xtrain,Xtest,fea_list = self.label_encoding(Xtrain,Xtest)
-        else:
-            fea_list = []
+        
+        fea_list = []
             
         Xtrain['low'] = 0
         Xtrain.loc[Xtrain['interest_level'] == 0, 'low'] = 1
@@ -156,7 +172,7 @@ class Categorical_cv(CategoricalFeature):
         return Xtrain,Xtest,fea_list    
 
 class CategoricalLit(CategoricalFeature):
-    def __init__(self,nfold,bEncoding,k=5.0,f=1.0,r_k=0.01,g=1.0):
+    def __init__(self,nfold,k=5.0,f=1.0,r_k=0.01,g=1.0):
         self.k = k
         self.f = f
         self.r_k = r_k
@@ -164,7 +180,7 @@ class CategoricalLit(CategoricalFeature):
         self.nfold = nfold
         self.global_avg = None
         
-        super(CategoricalLit,self).__init__(bEncoding)
+        super(CategoricalLit,self).__init__()
         self.method_info = "Categorical feature by Branden, it is lit"
         
     def cat2num(self,df_tr_,df_te_,cat_var,target):
@@ -217,10 +233,8 @@ class CategoricalLit(CategoricalFeature):
         #    Xtrain[f] = encoder.transform(Xtrain[f].ravel())
         #    Xtest[f] = encoder.transform(Xtest[f].ravel())
         
-        if self.bEncoding:    
-            Xtrain,Xtest,fea_list = self.label_encoding(Xtrain,Xtest)
-        else:
-            fea_list = []
+        
+        fea_list = []
         Xtrain['low'] = 0
         Xtrain.loc[Xtrain['interest_level'] == 0, 'low'] = 1
         Xtrain['medium'] = 0
@@ -613,7 +627,7 @@ class AddressFeature(BaseFeatureExtraction):
         return train_df,test_df,flist
 
 class GbmQuantPrice(BaseFeatureExtraction):
-    def __init__(self,independent_var,output_name):
+    def __init__(self,independent_var,output_name,n_estimators=100,max_depth=2):
         #independent_var can be:
         # 1. ['longitude','latitude']
         # 2. ['longitude','latitude','bathrooms']
@@ -624,6 +638,8 @@ class GbmQuantPrice(BaseFeatureExtraction):
         self.method_info = r"Use GBM to predict quantile house price using GBM quantile regression"
         self.independent_var = independent_var
         self.output_name = output_name
+        self.n_estimators=n_estimators
+        self.max_depth = max_depth
         
     def transform(self,train_df_,test_df_):
         from sklearn.ensemble import GradientBoostingRegressor
@@ -647,7 +663,7 @@ class GbmQuantPrice(BaseFeatureExtraction):
             jj = 0
             all_quantile = np.zeros((len(tmp),9))
             for alpha in np.arange(0.1,1,0.1):
-                rgr = GradientBoostingRegressor(loss='quantile',alpha=alpha,n_estimators=100,max_depth=2)
+                rgr = GradientBoostingRegressor(loss='quantile',alpha=alpha,n_estimators=self.n_estimators,max_depth=self.max_depth)
                 rgr.fit(tmp[self.independent_var],tmp['price'].as_matrix().ravel())
                 pred = rgr.predict(tmp[self.independent_var])
                 all_quantile[:,jj] = pred
@@ -767,8 +783,8 @@ class Miscellous(BaseFeatureExtraction):
         gp = train_df.append(test_df).groupby('hours').size()
         gp.name = 'hour_size'
         gp = gp.reset_index()
-        train_df = pd.merge(train_df,gp,on='hours')
-        test_df = pd.merge(test_df,gp,on='hours')
+        train_df = pd.merge(train_df,gp,on='hours',how='left')
+        test_df = pd.merge(test_df,gp,on='hours',how='left')
         del test_df['hours']
         del train_df['hours']
         
@@ -813,5 +829,6 @@ class Miscellous(BaseFeatureExtraction):
         #test_df['price_per_bath'] = test_df['price'] / test_df['bathrooms']
         #test_df['price_per_room'] = test_df['price'] / (0.5*test_df['bathrooms'] + test_df['bedrooms'] )
         
-        fea_list = ['weekdays','manager_count','building_count',"num_features","num_description_words","days","num_photos", "created_month", "created_day", "created_hour"]
+        fea_list = ['hour_size','weekdays','manager_count','building_count',"num_features",
+        "num_description_words","days","num_photos", "created_month", "created_day", "created_hour"]
         return train_df,test_df,fea_list
