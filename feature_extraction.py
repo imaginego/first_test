@@ -35,8 +35,8 @@ class CategoricalEncoding(BaseFeatureExtraction):
         fea_list = [x+'_coding' for x in categorical]
         for f in categorical:
             encoder = preprocessing.LabelEncoder()
-            tmp = df[f].copy().sort_values()
-            encoder.fit(tmp) 
+            tmp = df.groupby(f).size().sort_values()
+            encoder.fit(list(tmp.index) )
             df1[f+'_coding'] = encoder.transform(df1[f].ravel())
             df2[f+'_coding'] = encoder.transform(df2[f].ravel())
             mm = max(max(df1[f+'_coding']),max(df2[f+'_coding']))
@@ -270,11 +270,7 @@ class TextFeature(BaseFeatureExtraction):
         
 
         df['description'] = df['description'].map(lambda x:x.lower())
-        #---------------------------
-        #original length of the first feature, meant to capture those features typed in with wrong 
-        # format -- all features are cramed into one phrase
-        df['len_feature0'] = df['features'].map(lambda x:0 if len(x)==0 else len(x[0])) 
-        #-----------------------------
+       
     
         def fea_clean(x): 
             if len(x) == 1:
@@ -759,9 +755,9 @@ class PriceQuantileFeature(BaseFeatureExtraction):
 
 
 
-class Miscellous(BaseFeatureExtraction):
+class BasicFeature(BaseFeatureExtraction):
     def __init__(self):
-        super(Miscellous,self).__init__()
+        super(BasicFeature,self).__init__()
         self.method_info = "Miscellous features"
 
     def transform(self,train_df_,test_df_):    
@@ -805,7 +801,9 @@ class Miscellous(BaseFeatureExtraction):
         # count of "features" #
         train_df["num_features"] = train_df["features"].apply(len)
         test_df["num_features"] = test_df["features"].apply(len)
-
+        train_df['len_feature0'] = train_df['features'].map(lambda x:0 if len(x)==0 else len(x[0])) 
+        test_df['len_feature0'] = test_df['features'].map(lambda x:0 if len(x)==0 else len(x[0])) 
+        
         # count of words present in description column #
         train_df["num_description_words"] = train_df["description"].apply(lambda x: len(x.split(" ")))
         test_df["num_description_words"] = test_df["description"].apply(lambda x: len(x.split(" ")))
@@ -823,12 +821,17 @@ class Miscellous(BaseFeatureExtraction):
         train_df = pd.merge(train_df,gp,how='left')
         test_df = pd.merge(test_df,gp,how='left')
         
-        #train_df['price_per_bath'] = train_df['price'] / train_df['bathrooms']
-        #train_df['price_per_room'] = train_df['price'] / (train_df['bathrooms'] + train_df['bedrooms'] )
-
-        #test_df['price_per_bath'] = test_df['price'] / test_df['bathrooms']
-        #test_df['price_per_room'] = test_df['price'] / (0.5*test_df['bathrooms'] + test_df['bedrooms'] )
+        stuff_one = lambda x:x if x>0 else 1
+        train_df['price_per_bath'] = train_df['price'] / train_df['bathrooms'].map(stuff_one)
+        train_df['price_per_room'] = train_df['price'] / train_df['bedrooms'].map(stuff_one)
+        test_df['price_per_bath'] = test_df['price'] / test_df['bathrooms'].map(stuff_one)
+        test_df['price_per_room'] = test_df['price'] / test_df['bedrooms'].map(stuff_one)
+        train_df['room_per_bath'] = train_df['bedrooms']/train_df['bathrooms'].map(stuff_one)
+        test_df['room_per_bath'] = test_df['bedrooms']/test_df['bathrooms'].map(stuff_one)
+        
+        
         
         fea_list = ['hour_size','weekdays','manager_count','building_count',"num_features",
-        "num_description_words","days","num_photos", "created_month", "created_day", "created_hour"]
+        "num_description_words","days","num_photos", "created_month", "created_day", 
+        "created_hour",'price_per_bath','price_per_room','room_per_bath','len_feature0']
         return train_df,test_df,fea_list
